@@ -14,13 +14,14 @@ void type(char*);
 int is_shell_builtin(char*);
 char* find_path(const char*);
 int is_executable(const char*);
+void execute_prog(char**);
 
 const char *shell_builtin[NUM_BUILTIN] = {"echo", "exit", "type"};
 
 int main(){
     while(1){
         setbuf(stdout, NULL);
-        printf("$");
+        printf("$ ");
         char input[100];
         fgets(input, 100, stdin);
         input[strlen(input) - 1] = '\0';
@@ -49,24 +50,35 @@ void process_input(char* input){
     }
     
     //echo 
-    if (!strcmp(argv[0], "echo")){
+    else if (!strcmp(argv[0], "echo")){
         echo(argv, argc);
     }
 
     //type
-    if (!strcmp(argv[0], "type")){
+    else if (!strcmp(argv[0], "type")){
         type(argv[1]);
+    }
+
+    else if (!(find_path(argv[0]) == NULL)){
+        execute_prog(argv);
+    }
+
+    else {
+        printf("%s: Command not found", argv[0]);
     }
 }
 
 void echo(char** argv, int argc){
     for (int i = 1; i < argc; i++){
-        printf("%s", argv[i]);
+        printf("%s ", argv[i]);
     }
     printf("\n");
 }
 
 void type(char *argv){
+    if (argv == NULL){
+        return;
+    }
     if (is_shell_builtin(argv)){
         printf("%s is a shell builtin\n", argv);
     }else{
@@ -111,4 +123,23 @@ char* find_path(const char* arg){
 
 int is_executable(const char* path){
     return access(path, X_OK) == 0;
+}
+
+void execute_prog(char** argv){
+    pid_t pid = fork();
+
+    if (pid == 0){
+        if (execvp(argv[0], argv) == -1){
+            perror("execvp failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (pid > 0){
+        int status;
+        waitpid(pid, &status, 0);
+    }
+    else{
+        perror("fork failed\n");
+        exit(EXIT_FAILURE);
+    }
 }
