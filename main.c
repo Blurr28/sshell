@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define NUM_BUILTIN 3
+#define NUM_BUILTIN 5
 
 void process_input(char*);
 void echo(char** , int);
@@ -15,10 +15,13 @@ int is_shell_builtin(char*);
 char* find_path(const char*);
 int is_executable(const char*);
 void execute_prog(char**);
-
-const char *shell_builtin[NUM_BUILTIN] = {"echo", "exit", "type"};
+void working_dir();
+void change_dir(const char*);
+void startup_art();
+const char *shell_builtin[NUM_BUILTIN] = {"echo", "exit", "type", "pwd", "cd"};
 
 int main(){
+    startup_art();
     while(1){
         setbuf(stdout, NULL);
         printf("$ ");
@@ -63,8 +66,16 @@ void process_input(char* input){
         execute_prog(argv);
     }
 
+    else if (!strcmp(argv[0], "cd")){
+        change_dir(argv[1]);
+    }
+
+    else if (!(strcmp(argv[0], "pwd"))){
+
+    }
+
     else {
-        printf("%s: Command not found", argv[0]);
+        printf("%s: Command not found\n", argv[0]);
     }
 }
 
@@ -142,4 +153,49 @@ void execute_prog(char** argv){
         perror("fork failed\n");
         exit(EXIT_FAILURE);
     }
+}
+
+void working_dir(){
+    char* dir = getenv("PWD");
+    printf("%s", dir);
+}
+
+void change_dir(const char* path){
+    char* home = getenv("HOME");
+    static char prev_dir[1024];
+
+    if (path == NULL || strcmp(path, "~") == 0){
+        path = home;
+    } else if (strcmp(path, "-") == 0) {
+        if (prev_dir[0] == '\0'){
+            fprintf(stderr, "cd: No previous directory\n");
+            return;
+        }
+        path = prev_dir;
+    }
+
+    char current_dir[1024];
+    getcwd(current_dir, sizeof(current_dir));
+
+    if (chdir(path) != 0){
+        char error_msg[256];
+        snprintf(error_msg, sizeof(error_msg), "cd: %s", path);
+        perror(error_msg);
+    } else {
+        strcpy(prev_dir, current_dir);
+    }
+
+}
+
+void startup_art(){
+    printf("\n");
+    printf("       _____ _                 _         _____ _          _ _ \n");
+    printf("      / ____(_)               | |       / ____| |        | | |\n");
+    printf("     | (___  _ _ __ ___  _ __ | | ___  | (___ | |__   ___| | |\n");
+    printf("      \\___ \\| | '_ ` _ \\| '_ \\| |/ _ \\  \\___ \\| '_ \\ / _ \\ | |\n");
+    printf("      ____) | | | | | | | |_) | |  __/  ____) | | | |  __/ | |\n");
+    printf("     |_____/|_|_| |_| |_| .__/|_|\\___| |_____/|_| |_|\\___|_|_|\n");
+    printf("                        | |                                   \n");
+    printf("                        |_|                                   \n");
+    printf("\n");
 }
