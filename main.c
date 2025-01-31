@@ -6,13 +6,14 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <ctype.h>
+#include <fcntl.h>
 
 #define NUM_BUILTIN 5
 #define MAX_ARGS 100
 #define MAX_VAR_LEN 256
 
-void process_command(int, char**);
-int parse_input(char*, char**);
+void process_command(int, char**, char*, int);
+int parse_input(char*, char**, char**, int*);
 void echo(char** , int);
 void type(char*);
 int is_shell_builtin(char*);
@@ -26,12 +27,18 @@ void expand_variables(char*);
 const char *shell_builtin[NUM_BUILTIN] = {"echo", "exit", "type", "pwd", "cd"};
 
 int main(){
+    int saved_stdout = dup(STDOUT_FILENO);
     startup_art();
     while(1){
+        if (!isatty(STDOUT_FILENO)){
+            dup2(saved_stdout, STDOUT_FILENO);
+        }
         setbuf(stdout, NULL);
         printf("$ ");
         char input[256];
         char *argv[MAX_ARGS];
+        char *output_file = NULL;
+        int append = 0;
 
         if (fgets(input, sizeof(input), stdin) == NULL ) break;
         if (input[0] == '\n') continue;
@@ -45,15 +52,16 @@ int main(){
         }
         
         int argc;
-        argc = parse_input(input, argv);
-        process_command(argc, argv);
+        argc = parse_input(input, argv, &output_file, &append);
+        process_command(argc, argv, output_file, append);
         
     }
+    close(saved_stdout);
     return 0;
 }
 
 
-int parse_input(char* input, char*argv[]){
+int parse_input(char* input, char*argv[], char** output_file, int *append){
     //clean input 
     int argc = 0;
     char* ptr = input;
@@ -61,6 +69,23 @@ int parse_input(char* input, char*argv[]){
     while(*ptr){
         while (*ptr == ' ') ptr++;
         if (*ptr == '\0') break;
+
+        if (*ptr == '>'){
+            ptr++;
+            if (*ptr == '>') {
+                *append = 1;
+                ptr++;
+            }
+
+            while (*ptr == ' ') ptr++;
+            if (*ptr){
+                *output_file = ptr;
+                while(*ptr &&  *ptr != ' ') ptr++;
+                if (*ptr == ' ') *ptr++ = '\0';
+            }
+            continue;
+        }
+
         if (*ptr == '\''){
             ptr++;
             argv[argc] = ptr;
@@ -129,7 +154,25 @@ void expand_variables(char* arg){
     }
 }
 */
-void process_command(int argc, char*argv[]){
+void process_command(int argc, char*argv[], char* output_file, int append){
+    if (output_file){
+        int fd;
+        
+
+        if (append){
+            fd = open(output_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        }else {
+            fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        }
+
+        if (fd == -1){
+            perror("open");
+            exit(1);
+        }
+
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+    }
 
     if (!strcmp(argv[0], "exit")){
         exit(0);
