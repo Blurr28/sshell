@@ -7,8 +7,9 @@
 #include <sys/wait.h>
 
 #define NUM_BUILTIN 5
+#define MAX_ARGS 100
 
-void process_input(char*);
+void process_input(char*, char**);
 void echo(char** , int);
 void type(char*);
 int is_shell_builtin(char*);
@@ -25,25 +26,55 @@ int main(){
     while(1){
         setbuf(stdout, NULL);
         printf("$ ");
-        char input[100];
-        fgets(input, 100, stdin);
-        input[strlen(input) - 1] = '\0';
+        char input[256];
+        char *argv[MAX_ARGS];
 
-        process_input(input);
+        if (fgets(input, sizeof(input), stdin) == NULL ) break;
+        if (input[0] == '\n') continue;
+
+        size_t len = strlen(input);
+        if (len > 0 && input[len-1] == '\n'){
+            input[len - 1] = '\0';
+        } else {
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
+        }
+        
+
+        process_input(input, argv);
         
     }
     return 0;
 }
 
-void process_input(char* input){
+void process_input(char* input, char*argv[]){
     //clean input 
-    char *argv[10];
     int argc = 0;
-    char *token = strtok(input, " ");
-    while (token != NULL){
-        argv[argc++] = token;
-        token = strtok(NULL, " ");
+    char* ptr = input;
+
+    while(*ptr){
+        while (*ptr == ' ') ptr++;
+        if (*ptr == '\0') break;
+        if (*ptr == '\''){
+            ptr++;
+            argv[argc] = ptr;
+            while (*ptr && *ptr != '\'') ptr++;
+            if (*ptr == '\''){
+                *ptr = '\0';
+                ptr++;
+            }
+        }
+        else {
+            argv[argc] = ptr;
+            while (*ptr && *ptr != ' ') ptr++;
+            if (*ptr == ' '){
+                *ptr = '\0';
+                ptr++;
+            }
+        }
+        argc++;
     }
+
     argv[argc] = NULL;
 
     //check for commands
