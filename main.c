@@ -5,11 +5,14 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <ctype.h>
 
 #define NUM_BUILTIN 5
 #define MAX_ARGS 100
+#define MAX_VAR_LEN 256
 
-void process_input(char*, char**);
+void process_command(int, char**);
+int parse_input(char*, char**);
 void echo(char** , int);
 void type(char*);
 int is_shell_builtin(char*);
@@ -19,6 +22,7 @@ void execute_prog(char**);
 void working_dir();
 void change_dir(const char*);
 void startup_art();
+void expand_variables(char*);
 const char *shell_builtin[NUM_BUILTIN] = {"echo", "exit", "type", "pwd", "cd"};
 
 int main(){
@@ -40,14 +44,16 @@ int main(){
             while ((c = getchar()) != '\n' && c != EOF);
         }
         
-
-        process_input(input, argv);
+        int argc;
+        argc = parse_input(input, argv);
+        process_command(argc, argv);
         
     }
     return 0;
 }
 
-void process_input(char* input, char*argv[]){
+
+int parse_input(char* input, char*argv[]){
     //clean input 
     int argc = 0;
     char* ptr = input;
@@ -64,6 +70,23 @@ void process_input(char* input, char*argv[]){
                 ptr++;
             }
         }
+        else if (*ptr == '"'){
+            ptr++;
+            argv[argc] = ptr;
+            while (*ptr && *ptr != '"'){
+                ptr++;
+                if (*ptr == '\\' && (*(ptr + 1) == '"' || *(ptr + 1) == '$')){
+                    memmove(ptr, ptr+1, strlen(ptr));
+                }
+                ptr++;
+            }
+            if (*ptr == '"'){
+                *ptr = '\0';
+                ptr++;
+            }
+            
+        }
+
         else {
             argv[argc] = ptr;
             while (*ptr && *ptr != ' ') ptr++;
@@ -77,8 +100,37 @@ void process_input(char* input, char*argv[]){
 
     argv[argc] = NULL;
 
-    //check for commands
-    //exit
+    return argc;
+}
+/*
+void expand_variables(char* arg){
+    char buffer[MAX_VAR_LEN];
+
+    char *ptr = arg;
+
+    while (*ptr){
+        if (*ptr == '$'){
+            ptr++;
+            char var_name[MAX_VAR_LEN];
+            char *var_ptr = var_name;
+
+            while (*ptr && (isalnum(*ptr) || *ptr == '_')){
+                *var_ptr++ = *ptr++;
+            }
+            *var_ptr = '\0';
+
+            char *var_value = getenv(var_name);
+            if (var_value){
+                strcpy(buffer, var_value);
+            }
+            buffer[strlen(var_value) - 1] = '\0';
+            strcpy(arg, buffer);
+        }
+    }
+}
+*/
+void process_command(int argc, char*argv[]){
+
     if (!strcmp(argv[0], "exit")){
         exit(0);
     }
